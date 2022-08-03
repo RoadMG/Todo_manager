@@ -1,86 +1,124 @@
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { createGlobalStyle } from "styled-components";
-import { ThemeProvider } from "styled-components";
-import { useState } from "react";
-import { darkTheme, lightTheme } from "./theme";
-import Router from "./Router";
-import { isDarkAtom } from "./atoms";
-import { useRecoilValue } from "recoil";
+import { DragDropContext, Droppable, DropResult } from "react-beautiful-dnd";
+import { useRecoilState } from "recoil";
+import styled from "styled-components";
+import { IToDoState, toDoState } from "./atoms";
+import Board from "./components/Board";
+import Creater from "./components/Creater";
+import RubbishBin from "./components/Rubbish";
 
-const GlobalStyle = createGlobalStyle`
-@import url('https://fonts.googleapis.com/css2?family=PT+Sans+Narrow&family=Source+Sans+Pro:wght@300;400&display=swap');
- html, body, div, span, applet, object, iframe,
-h1, h2, h3, h4, h5, h6, p, blockquote, pre,
-a, abbr, acronym, address, big, cite, code,
-del, dfn, em, img, ins, kbd, q, s, samp,
-small, strike, strong, sub, sup, tt, var,
-b, u, i, center,
-dl, dt, dd, menu, ol, ul, li,
-fieldset, form, label, legend,
-table, caption, tbody, tfoot, thead, tr, th, td,
-article, aside, canvas, details, embed,
-figure, figcaption, footer, header, hgroup,
-main, menu, nav, output, ruby, section, summary,
-time, mark, audio, video {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  font-size: 100%;
-  font: inherit;
-  vertical-align: baseline;
-}
-/* HTML5 display-role reset for older browsers */
-article, aside, details, figcaption, figure,
-footer, header, hgroup, main, menu, nav, section {
-  display: block;
-}
-/* HTML5 hidden-attribute fix for newer browsers */
-*[hidden] {
-    display: none;
-}
-body {
-  line-height: 1;
-}
-menu, ol, ul {
-  list-style: none;
-}
-blockquote, q {
-  quotes: none;
-}
-blockquote:before, blockquote:after,
-q:before, q:after {
-  content: '';
-  content: none;
-}
-table {
-  border-collapse: collapse;
-  border-spacing: 0;
-}
-*{
-  box-sizing: border-box;
-}
-body{
-  font-family:Source Sans Pro, sans-serif;
-  background-color: ${(props) => props.theme.bgColor};
-  color: ${(props) => props.theme.textColor}
-}
-a{
-  text-decoration: none;
-  color: inherit;
-}
+const Wrapper = styled.div`
+  display: flex;
+  width: 100vw;
+  margin: 0 auto;
+  align-items: center;
+  height: 100vh;
+  flex-direction: column;
+  justify-content: center;
+`;
+
+const Boards = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
 `;
 
 function App() {
-  const isDark = useRecoilValue(isDarkAtom);
+  const [toDos, setToDos] = useRecoilState(toDoState);
+  const onDragEnd = ({ destination, source }: DropResult) => {
+    if (!destination) return;
+    else if (destination.droppableId === "rubbish") {
+      setToDos((allBoards) => {
+        const oldToDo = [...allBoards[source.droppableId]];
+        oldToDo.splice(source.index, 1);
+        return {
+          ...allBoards,
+          [source.droppableId]: oldToDo,
+        };
+      });
+    } else if (source.droppableId === "window") {
+      setToDos((allBoards) => {
+        const oldBoardskey = Object.keys(allBoards);
+        const targetBoard = oldBoardskey[source.index];
+
+        oldBoardskey.splice(source.index, 1);
+        oldBoardskey.splice(destination?.index, 0, targetBoard);
+
+        const newBoards: IToDoState = {};
+
+        oldBoardskey.forEach((key, i) => {
+          let keyName = oldBoardskey[i];
+          newBoards[keyName] = allBoards[keyName];
+        });
+
+        return newBoards;
+      });
+    } else if (destination.droppableId === source.droppableId) {
+      //same board movement
+      setToDos((allBoards) => {
+        const boardCopy = [...allBoards[source.droppableId]];
+        const taskObj = boardCopy[source.index];
+        boardCopy.splice(source.index, 1);
+        boardCopy.splice(destination?.index, 0, taskObj);
+        return {
+          ...allBoards,
+          [source.droppableId]: boardCopy,
+        };
+      });
+    } else if (destination.droppableId !== source.droppableId) {
+      //cross board movement
+      setToDos((allBoards) => {
+        const sourceBoard = [...allBoards[source.droppableId]];
+        const taskObj = sourceBoard[source.index];
+        const destinationtBoard = [...allBoards[destination.droppableId]];
+        sourceBoard.splice(source.index, 1);
+        destinationtBoard.splice(destination?.index, 0, taskObj);
+        return {
+          ...allBoards,
+          [source.droppableId]: sourceBoard,
+          [destination.droppableId]: destinationtBoard,
+        };
+      });
+    }
+  };
+
   return (
     <>
-      <ThemeProvider theme={isDark ? darkTheme : lightTheme}>
-        <GlobalStyle />
-        <Router />
-        <ReactQueryDevtools initialIsOpen={true} />
-      </ThemeProvider>
+      <Creater />
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable droppableId="window" direction="horizontal">
+          {(magic) => (
+            <Wrapper>
+              <Boards ref={magic.innerRef} {...magic.droppableProps}>
+                {Object.keys(toDos).map((boardId, index: number) => (
+                  <Board
+                    boardID={boardId}
+                    key={boardId}
+                    toDos={toDos[boardId]}
+                    index={index}
+                  />
+                ))}
+                {magic.placeholder}
+              </Boards>
+            </Wrapper>
+          )}
+        </Droppable>
+        <RubbishBin />
+      </DragDropContext>
     </>
   );
 }
 
 export default App;
+
+// Challenge List
+/*
+
+1. 쓰레기통 만들어서 드래그 해서 없애기
+2. Local Storage 만들어서 넣기
+3. Form 입력 만들어서 Form 생성하기
+4. Form도 Drag해서 이동시키기
+
+*/
