@@ -1,0 +1,10 @@
+{
+  "files": {
+    "main.js": "/Todo_manager/static/js/main.ff968d8e.js",
+    "index.html": "/Todo_manager/index.html",
+    "main.ff968d8e.js.map": "/Todo_manager/static/js/main.ff968d8e.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.ff968d8e.js"
+  ]
+}
